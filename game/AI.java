@@ -5,7 +5,7 @@ import java.util.Random;
 final class AI {
 	//****************************************
 	//false, если отладочный вывод в консоль не требуется.
-	private final boolean DEBUG_OUTPUT = false;
+	private final boolean DEBUG_OUTPUT = true;
 	//****************************************
 	private boolean playerX;
 	private int size;
@@ -28,7 +28,11 @@ final class AI {
 	/*TODO: если свободные две боковых перпендикулярные линии и точка между ними, то в перую очередь надо ставить туда,
 	а не просто в первый же свободный угол.
 	TODO: если размерность поля четная и игрок решил вообще не заполнять центральный квардатик, то надо просто в горизонтальный или
-	вертикальный ряд поставить две точки компа, а не заполнять его полностью. */
+	вертикальный ряд поставить две точки компа, а не заполнять его полностью. 
+	TODO: рандомный выбор для построения линий. Если линия начата и не перекрыта и нет необходимости срочно защищаться, достраиваем ее.
+	TODO: второй вариант предыдущего туду. Можно строить сразу две линии, чтобы запутать игрока, и перекрывать его ходы.
+	Когда следует заполнять точки второй линии?
+	Меняем общий принцип: в первую очередь строим линии, а потом при необходимости перекрываем линии игрока.*/
 	public void compTurnAI()
 	{
 		//System.out.println("НОВЫЙ ХОД");
@@ -47,11 +51,18 @@ final class AI {
 		}
 
 		// 1. Свободен ли центр (если размерность четная). Ставится по диагонали от занятой и на одной из двух оставшихся.
-		//Как-то тут не спасает xor...
-		if (this.size % 2 == 0 && (fillCenter(this.size - 1, this.size - 1, this.size, this.size, playerDot)
-				|| fillCenter(this.size - 1, this.size, this.size, this.size - 1, playerDot)
-				|| fillCenter(this.size, this.size, this.size - 1, this.size - 1, playerDot)
-				|| fillCenter(this.size, this.size - 1, this.size - 1, this.size, playerDot)))
+		/*TODO
+		0. ПЕРВЫХ ХОД В ЦЕНТРЕ - рандомно.
+		1. ВТОРОЙ ХОД В ЦЕНТРЕ. Ставим в линию (горизонтальную или вертикальную - не важно), если это возможно.
+		3. Черт с ним, играем дальше.
+		Если комп играет за крестики, то первым делом игрок поставит точку рандомно или в центре. Далее есть три варианта:
+		1. Игрок поставит рядом или 2. поставим где-то вне центра - ставим в линию перпендикулярно.
+		3. Игрок поставил в центре по диагонали - игнорируем и продолжаем строить свою линию (которой, блин, нет).
+		Если комп играет за нолики, от есть еще варианты:
+		1. Первых ход, игрок поставил в центре - ставим по диагонали.
+		2. Второй ход, игрок поставил рядом - игнорируем.
+		3. Второй ход, игрок поставил вне центра - достраиваем перпендикулярную линию, ПЕРЕКРЫВАЯ ДИАГОНАЛЬ.*/
+		if (this.size % 2 == 0 && this.fillCenter())
 			return;
 
 		// 2. Выигрывает ли игрок или комп.
@@ -72,11 +83,12 @@ final class AI {
 			}
 
 		// 4. Рандомный ход
+		//TODO: здесь должна быть ничья.
 		this.compTurnRandom();
 	}
 	
 	//Заполняет центр массива с четной размерностью.
-	private boolean fillCenter(int x0, int y0, int x1, int y1, ButtonsVals playerDot)
+	/*private boolean fillCenter(int x0, int y0, int x1, int y1, ButtonsVals playerDot)
 	{
 		if ((this.game.gameFieldButtons[x1/2][y1/2].getVal() == ButtonsVals.EMPTY
 				&& this.game.gameFieldButtons[x0/2][y0/2].getVal()==playerDot)
@@ -89,6 +101,23 @@ final class AI {
 			return true;
 		}
 		return false;
+	}*/
+	
+	private boolean fillCenter()
+	{
+		switch (this.filledCenterDiagonals)
+		{
+		case 0:
+			this.compTurnRandom((this.size-1)/2, (this.size-1)/2, this.size/2, this.size/2);
+			System.out.println("РАНДОМНЫЙ ХОД В ЦЕНТРЕ");
+			this.filledCenterDiagonals++;
+			return true;
+		case 1:
+			//TODO
+			return true;
+		default:
+			return false;
+		}
 	}
 	
 	/*Определяет, надо ли защищаться или намеренно атаковать, и вызывает функцию, отвечающую за действия атаки или защиты
@@ -135,11 +164,11 @@ final class AI {
 						playerDangerLine[i][0]=2;
 						compDangerLine[i][0]=2;					
 					}
-					//если есть точки компа, но нет точек игрока, ставим 1 (опасность есть) игроку
+					//если есть точки компа, но нет точек игрока, ставим 1 (опасность есть) игроку (нападение)
 					else if (playerDotsInLine[i][0]==0 && compDotsInLine[i][0]>1)
 						playerDangerLine[i][0]=1;
-					//аналогично
-					else if (playerDotsInLine[i][0]>1 && compDotsInLine[i][0]==0)
+					//аналогично (защита)
+					else if (playerDotsInLine[i][0]==this.size-1 && compDotsInLine[i][0]==0)
 						compDangerLine[i][0]=1;
 					//если вообще никаких точек на линии нет, ставим обоим 0
 					else
@@ -162,7 +191,7 @@ final class AI {
 					}
 					else if (playerDotsInLine[i][1]==0 && compDotsInLine[i][1]>1)
 						playerDangerLine[i][1]=1;
-					else if (playerDotsInLine[i][1]>1 && compDotsInLine[i][1]==0)
+					else if (playerDotsInLine[i][1]==this.size-1 && compDotsInLine[i][1]==0)
 						compDangerLine[i][1]=1;
 					else
 					{
@@ -231,7 +260,7 @@ final class AI {
 			}
 			System.out.println();
 		}
-		//после всех проверок обнуляем пассив количества точек, так как в проверках происходит только инкремент.
+		//после всех проверок обнуляем массив количества точек, так как в проверках происходит только инкремент.
 		//ни в коем случае не обнуляем "массив опасности"!!!
 		for (int i=0; i< this.size; i++)
 			for (int j=0; j<2; j++)
@@ -270,10 +299,10 @@ final class AI {
 		
 		//ДИАГОНАЛИ
 		//Если надо защищаться (только главная диагональ)...
-		if (this.checkMainDiag && playerDotsInMainDiagonal>=2)
+		if (this.checkMainDiag && playerDotsInMainDiagonal==this.size-1)
 			return lineAction(LineTypes.MAIN_DIAG, 0, true);
 		//Если надо защищаться (только побочная диагональ)...
-		if (this.checkSideDiag && playerDotsInSideDiagonal>=2)
+		if (this.checkSideDiag && playerDotsInSideDiagonal==this.size-1)
 			return lineAction(LineTypes.SIDE_DIAG, 0, true);
 		//Если надо нападать (только главная диагональ)...
 		if (this.checkMainDiag && compDotsInMainDiagonal>=2)
@@ -339,6 +368,20 @@ final class AI {
 		{
 			compCoordX = this.rand.nextInt(this.size);
 			compCoordY = this.rand.nextInt(this.size);
+		} while (this.game.gameFieldButtons[compCoordX][compCoordY].getVal() != ButtonsVals.EMPTY);
+		this.game.gameFieldButtons[compCoordX][compCoordY].drawButton(false, this.playerX);
+		debugOutput(compCoordX, compCoordY, DebugOutputTypes.RANDOM, LineTypes.NO_ONE, false);
+	}
+	
+	//Рандомный ход в заданном прямоугольнике
+	void compTurnRandom(int x0, int y0, int x1, int y1)
+	{
+		int compCoordX=0;
+		int compCoordY=0;
+		do
+		{
+			compCoordX = this.rand.nextInt(x1-1)+x0;
+			compCoordY = this.rand.nextInt(y1-1)+y0;
 		} while (this.game.gameFieldButtons[compCoordX][compCoordY].getVal() != ButtonsVals.EMPTY);
 		this.game.gameFieldButtons[compCoordX][compCoordY].drawButton(false, this.playerX);
 		debugOutput(compCoordX, compCoordY, DebugOutputTypes.RANDOM, LineTypes.NO_ONE, false);
